@@ -30,7 +30,7 @@ abstract contract ERC20Payable is ERC20, ERC20Permit, AccessControlEnumerable {
 
     function setPaymentChannel(uint256 channelId, address newOrderSigner, address newCashier) external onlyRole(PAYMENT_MANAGER_ROLE) {
         require((newOrderSigner != address(0) && newCashier != address(0))
-            || (newOrderSigner == address(0) && newCashier == address(0)), "WoM20Payable: newOrderSigner is address(0) while newCashier is not, and vice versa");
+            || (newOrderSigner == address(0) && newCashier == address(0)), "WoM20Payable: newOrderSigner is address zero while newCashier is not and vice versa");
         ChannelData storage paymentChannel = paymentChannels[channelId];
         address oldOrderSigner = paymentChannel.orderSigner;
         address oldCashier = paymentChannel.cashier;
@@ -45,7 +45,7 @@ abstract contract ERC20Payable is ERC20, ERC20Permit, AccessControlEnumerable {
         address orderSigner = paymentChannel.orderSigner;
         address cashier = paymentChannel.cashier;
         require(orderSigner != address(0) && cashier != address(0), "WoM20Payable: invalid channelId");
-        require(!paymentChannel.usedInvoices[invoiceNo], "WoM20Payable: order already paid");
+        require(!paymentChannel.usedInvoices[invoiceNo], "WoM20Payable: order was already paid");
 
         bytes32 structHash = keccak256(abi.encode(_PAYMENT_TYPEHASH, channelId, invoiceNo, amount, deadline));
         bytes32 hash = _hashTypedDataV4(structHash);
