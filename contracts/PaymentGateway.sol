@@ -18,17 +18,17 @@ contract PaymentGateway is Withdrawable, EIP712 {
     mapping(uint256 => ChannelData) public paymentChannels;
 
     // solhint-disable-next-line var-name-mixedcase
-    bytes32 private immutable _PAYMENT_TYPEHASH =
-    keccak256("Payment(uint256 channelId,uint256 invoiceNo,uint256 deadline,IERC20 tokenContract,uint256 amount)");
+    bytes32 public immutable _PAYMENT_TYPEHASH =
+    keccak256("payment(uint256 channelId, uint256 invoiceNo, uint256 expiredAt, IERC20 tokenContract, uint256 amount, bytes memory signature) external");
 
     bytes32 public immutable _WITHDRAW_TYPEHASH =
-    keccak256("Withdraw(uint256 channelId,uint256 invoiceNo,uint256 deadline,IERC20 tokenContract,address recipient,uint256 amount)");
+    keccak256("withdraw(uint256 channelId, uint256 invoiceNo, uint256 expiredAt, address recipient, IERC20 tokenContract, uint256 amount, bytes memory signature) external");
 
     event PaymentChannelChanged(uint256 indexed channelId, address oldOrderSigner, address oldCashier, address indexed newOrderSigner, address indexed newCashier);
 
-    event Payment(uint256 indexed channelId, uint256 indexed invoiceNo, IERC20 tokenContract, address indexed sender, address recipient, uint256 amount);
+    event Payment(uint256 indexed channelId, uint256 indexed invoiceNo, IERC20 tokenContract, address indexed txnSender, address cashier, uint256 amount);
 
-    event Withdrawal(uint256 indexed channelId, uint256 indexed invoiceNo, IERC20 tokenContract, address sender, address indexed recipient, uint256 amount);
+    event Withdrawal(uint256 indexed channelId, uint256 indexed invoiceNo, IERC20 tokenContract, address cashier, address indexed recipient, uint256 amount);
 
 
     bytes32 public constant PAYMENT_MANAGER_ROLE = keccak256("PAYMENT_MANAGER_ROLE");
@@ -48,15 +48,15 @@ contract PaymentGateway is Withdrawable, EIP712 {
         emit PaymentChannelChanged(channelId, oldOrderSigner, oldCashier, newOrderSigner, newCashier);
     }
 
-    function payment(uint256 channelId, uint256 invoiceNo, uint256 deadline, IERC20 tokenContract, uint256 amount, bytes memory signature) external {
-        require(block.timestamp <= deadline, "PaymentGateway: expired deadline");
+    function payment(uint256 channelId, uint256 invoiceNo, uint256 expiredAt, IERC20 tokenContract, uint256 amount, bytes memory signature) external {
+        require(block.timestamp < expiredAt, "PaymentGateway: expired signature");
         ChannelData storage paymentChannel = paymentChannels[channelId];
         address orderSigner = paymentChannel.orderSigner;
         address cashier = paymentChannel.cashier;
         require(orderSigner != address(0) && cashier != address(0), "PaymentGateway: invalid channelId");
         require(!paymentChannel.usedInvoices[invoiceNo], "PaymentGateway: order already paid");
 
-        bytes32 structHash = keccak256(abi.encode(_PAYMENT_TYPEHASH, channelId, invoiceNo, deadline, tokenContract, amount));
+        bytes32 structHash = keccak256(abi.encode(_PAYMENT_TYPEHASH, channelId, invoiceNo, expiredAt, tokenContract, amount));
         bytes32 hash = _hashTypedDataV4(structHash);
         address signer = ECDSA.recover(hash, signature);
         require(signer == orderSigner, "PaymentGateway: invalid signature");
@@ -67,14 +67,14 @@ contract PaymentGateway is Withdrawable, EIP712 {
         emit Payment(channelId, invoiceNo, tokenContract, sender, cashier, amount);
     }
 
-    function withdraw(uint256 channelId, uint256 invoiceNo, uint256 deadline, IERC20 tokenContract, address recipient, uint256 amount, bytes memory signature) external {
-        require(block.timestamp <= deadline, "PaymentGateway: expired deadline");
+    function withdraw(uint256 channelId, uint256 invoiceNo, uint256 expiredAt, address recipient, IERC20 tokenContract, uint256 amount, bytes memory signature) external {
+        require(block.timestamp < expiredAt, "PaymentGateway: expired signature");
         ChannelData storage paymentChannel = paymentChannels[channelId];
         address orderSigner = paymentChannel.orderSigner;
         address cashier = paymentChannel.cashier;
         require(orderSigner != address(0) && cashier != address(0), "PaymentGateway: invalid channelId");
         require(!paymentChannel.usedInvoices[invoiceNo], "PaymentGateway: order already paid");
-        bytes32 structHash = keccak256(abi.encode(_WITHDRAW_TYPEHASH, channelId, invoiceNo, deadline, tokenContract, recipient, amount));
+        bytes32 structHash = keccak256(abi.encode(_WITHDRAW_TYPEHASH, channelId, invoiceNo, expiredAt, recipient, tokenContract, amount));
         bytes32 hash = _hashTypedDataV4(structHash);
         address signer = ECDSA.recover(hash, signature);
         require(signer == orderSigner, "PaymentGateway: invalid signature");

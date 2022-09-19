@@ -51,7 +51,7 @@ abstract contract Withdrawable is AccessControlEnumerable {
         emit ERC1155Withdrawal(nft, recipient, tokenId, amount);
     }
 
-    function withdrawNativeToken(address payable recipient, uint256 amount) external onlyRole(WITHDRAWER_ROLE) {
+    function withdrawNativeToken(address payable recipient, uint256 amount) external virtual onlyRole(WITHDRAWER_ROLE) {
         recipient.sendValue(amount);
         emit NativeTokenWithdrawal(recipient, amount);
     }
